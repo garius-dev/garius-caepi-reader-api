@@ -1,10 +1,9 @@
-﻿using Garius.Caepi.Reader.Api.Infrastructure.DB;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Serilog;
 using static Garius.Caepi.Reader.Api.Configuration.AppSecretsConfiguration;
 
-namespace Garius.Caepi.Reader.Api.Extensions
+namespace Garius.Caepi.Reader.Api.Infrastructure.DB.Extensions
 {
     public static class MigrationExtensions
     {
@@ -16,6 +15,8 @@ namespace Garius.Caepi.Reader.Api.Extensions
             try
             {
                 await EnsureDatabaseExistsAsync(rootConnectionString, connectionStringSettings.Database);
+
+                await AddExtensions(appConnectionString);
 
                 using var scope = app.Services.CreateScope();
                 var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -29,7 +30,6 @@ namespace Garius.Caepi.Reader.Api.Extensions
                 Log.Information("Database seed completed successfully.");
 
                 await EnsureUsersAndPermissionsAsync(appConnectionString, connectionStringSettings.Database, connectionStringSettings.Users);
-
             }
             catch (Exception ex)
             {
@@ -66,9 +66,9 @@ namespace Garius.Caepi.Reader.Api.Extensions
             }
         }
 
-        private static async Task EnsureUsersAndPermissionsAsync(string connectionString, string databaseName, DatabaseUser users)
+        private static async Task EnsureUsersAndPermissionsAsync(string appConnectionString, string databaseName, DatabaseUser users)
         {
-            using var conn = new NpgsqlConnection(connectionString);
+            using var conn = new NpgsqlConnection(appConnectionString);
             await conn.OpenAsync();
 
             await EnsureUserExistsAsync(conn, users.Admin.Name, users.Admin.Pwd);
@@ -132,8 +132,41 @@ namespace Garius.Caepi.Reader.Api.Extensions
             await cmd.ExecuteNonQueryAsync();
         }
 
+        public static async Task AddExtensions(string appConnectionString)
+        {
+            await using var conn = new NpgsqlConnection(appConnectionString);
+            await conn.OpenAsync();
+
+            var sqlCommands = new[]
+            {
+                "CREATE EXTENSION IF NOT EXISTS unaccent;",
+                "CREATE EXTENSION IF NOT EXISTS pg_trgm;",
+                @"
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (SELECT 1 FROM pg_ts_config WHERE cfgname = 'simple_unaccent') THEN
+                        CREATE TEXT SEARCH CONFIGURATION simple_unaccent ( COPY = simple );
+                        ALTER TEXT SEARCH CONFIGURATION simple_unaccent
+                            ALTER MAPPING FOR hword, hword_part, word WITH unaccent, simple;
+                    END IF;
+                END$$;
+                "
+            };
+
+            Log.Information("Executing extensions creation...");
+            foreach (var sql in sqlCommands)
+            {
+                Log.Information("Executing SQL: {Sql}", sql);
+                await using var cmd = new NpgsqlCommand(sql, conn);
+                await cmd.ExecuteNonQueryAsync();
+            }
+            Log.Information("extensions creation completed successfully.");
+        }
+
         private static string QuoteIdentifier(string identifier) => "\"" + identifier.Replace("\"", "\"\"") + "\"";
+
         private static string SqlQuotedLiteral(string s) => "'" + s.Replace("'", "''") + "'";
+
         private static string SqlLiteralForIdentifier(string s) => "quote_ident(" + SqlQuotedLiteral(s) + ")";
     }
 }

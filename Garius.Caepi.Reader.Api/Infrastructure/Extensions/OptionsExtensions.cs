@@ -1,4 +1,4 @@
-﻿namespace Garius.Caepi.Reader.Api.Extensions
+﻿namespace Garius.Caepi.Reader.Api.Infrastructure.Extensions
 {
     public static class OptionsExtensions
     {

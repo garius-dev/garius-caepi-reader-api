@@ -115,5 +115,54 @@ namespace Garius.Caepi.Reader.Api.Configuration
                 if (string.IsNullOrWhiteSpace(Pwd)) throw new InvalidOperationException("RedisSettings.Pwd is missing.");
             }
         }
+
+        public class ResendSettings
+        {
+            [Required(ErrorMessage = "A 'ApiKey' do Resend é obrigatória.")]
+            public string ApiKey { get; set; } = string.Empty;
+
+            [Required(ErrorMessage = "O e-mail de envio padrão ('FromEmail') do Resend é obrigatório.")]
+            [EmailAddress(ErrorMessage = "O 'FromEmail' do Resend deve ser um endereço de e-mail válido.")]
+            public string FromEmail { get; set; } = string.Empty;
+        }
+
+        public class CloudflareSettings
+        {
+            [Required(ErrorMessage = "A chave pública 'SiteKey' do Cloudflare é obrigatória.")]
+            public string SiteKey { get; set; } = string.Empty;
+
+            [Required(ErrorMessage = "A chave secreta 'SecretKey' do Cloudflare é obrigatória.")]
+            public string SecretKey { get; set; } = string.Empty;
+        }
+
+        public class GoogleExternalAuthSettings
+        {
+            [Required(ErrorMessage = "O 'ClientId' do Google é obrigatório.")]
+            public string ClientId { get; set; } = string.Empty;
+
+            [Required(ErrorMessage = "O 'ClientSecret' do Google é obrigatório.")]
+            public string ClientSecret { get; set; } = string.Empty;
+        }
+
+        public class MicrosoftExternalAuthSettings
+        {
+            [Required(ErrorMessage = "O 'ClientId' da Microsoft é obrigatório.")]
+            public string ClientId { get; set; } = string.Empty;
+
+            [Required(ErrorMessage = "O 'ClientSecret' da Microsoft é obrigatório.")]
+            public string ClientSecret { get; set; } = string.Empty;
+
+            [Required(ErrorMessage = "O 'TenantId' da Microsoft é obrigatório.")]
+            public string TenantId { get; set; } = string.Empty;
+        }
+
+        public class AppKeyManagementSettings
+        {
+            public string Key { get; set; } = default!;
+            public string IV { get; set; } = default!;
+
+            public byte[] GetKeyBytes() => Convert.FromBase64String(Key);
+            public byte[] GetIVBytes() => Convert.FromBase64String(IV);
+        }
     }
 }

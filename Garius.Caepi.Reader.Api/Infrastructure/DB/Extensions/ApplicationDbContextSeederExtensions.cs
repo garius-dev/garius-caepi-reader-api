@@ -3,7 +3,7 @@ using Garius.Caepi.Reader.Api.Domain.Entities.Identity;
 using Microsoft.AspNetCore.Identity;
 using System.Security.Claims;
 
-namespace Garius.Caepi.Reader.Api.Extensions
+namespace Garius.Caepi.Reader.Api.Infrastructure.DB.Extensions
 {
     public static class ApplicationDbContextSeederExtensions
     {

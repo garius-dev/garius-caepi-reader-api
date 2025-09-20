@@ -1,7 +1,7 @@
 ﻿using Garius.Caepi.Reader.Api.Exceptions;
 using System.Threading.RateLimiting;
 
-namespace Garius.Caepi.Reader.Api.Extensions
+namespace Garius.Caepi.Reader.Api.Infrastructure.Extensions
 {
     public static class RateLimiterExtensions
     {
