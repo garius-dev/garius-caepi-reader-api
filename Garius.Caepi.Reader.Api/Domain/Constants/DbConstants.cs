@@ -22,7 +22,6 @@
             public const string Manage = "Permissions.Roles.Manage";
         }
 
-
         public static List<string> GetAllPermissions()
         {
             var allPermissions = new List<string>();

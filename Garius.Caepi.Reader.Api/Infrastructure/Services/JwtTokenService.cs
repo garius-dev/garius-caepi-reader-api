@@ -19,24 +19,20 @@ namespace Garius.Caepi.Reader.Api.Infrastructure.Services
             _jwtSettings = jwtSettings.Value;
         }
 
-        public string GenerateToken(ApplicationUser user, IList<string> roles, IEnumerable<string> permissions)
+        public string GenerateToken(ApplicationUser user, string tid, IList<string> roles, IEnumerable<string> permissions)
         {
             var claims = new List<Claim>
             {
                 new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
                 new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-                new(JwtRegisteredClaimNames.Iat, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
-                new(JwtRegisteredClaimNames.Iss, "garius-api"),
-                new(JwtRegisteredClaimNames.Aud, "garius-api-clients"),
-                new(JwtRegisteredClaimNames.Email, user.Email!),
+                new Claim(JwtRegisteredClaimNames.Iat, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
+                new Claim(JwtRegisteredClaimNames.Iss, "garius-api"),
+                new Claim(JwtRegisteredClaimNames.Aud, "garius-api-clients"),
                 new("firstName", user.FirstName ?? string.Empty),
                 new("lastName", user.LastName ?? string.Empty),
             };
 
-            if (user.Tenant != null)
-            {
-                claims.Add(new("Tid", user.TenantId.ToString()));
-            }
+            claims.Add(new("Tid", tid));
 
             claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
 

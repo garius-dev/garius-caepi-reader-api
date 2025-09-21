@@ -1,10 +1,11 @@
 ﻿using Garius.Caepi.Reader.Api.Domain.Abstractions;
+using Garius.Caepi.Reader.Api.Domain.Entities.Identity;
 using Garius.Caepi.Reader.Api.Domain.Interfaces;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace Garius.Caepi.Reader.Api.Domain.Entities.Identity
+namespace Garius.Caepi.Reader.Api.Domain.Entities
 {
-    public class RefreshToken : BaseEntity, ITenantEntity
+    public class UserTenant : BaseEntity, ITenantEntity
     {
         [ForeignKey(nameof(User))]
         public Guid UserId { get; set; }
@@ -14,10 +15,8 @@ namespace Garius.Caepi.Reader.Api.Domain.Entities.Identity
         public Guid TenantId { get; set; }
         public virtual Tenant Tenant { get; set; } = default!;
 
-        public string Token { get; set; } = string.Empty;
-        public DateTime ExpiresAt { get; set; }
-        public bool IsExpired => DateTime.UtcNow >= ExpiresAt;
-        public DateTime? RevokedAt { get; set; }
-        public bool IsActive => RevokedAt == null && !IsExpired;
+        [ForeignKey(nameof(Role))]
+        public Guid RoleId { get; set; }
+        public virtual ApplicationRole Role { get; set; } = default!;
     }
 }

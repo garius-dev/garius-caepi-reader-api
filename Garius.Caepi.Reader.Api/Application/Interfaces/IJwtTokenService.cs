@@ -5,6 +5,6 @@ namespace Garius.Caepi.Reader.Api.Application.Interfaces
 {
     public interface IJwtTokenService
     {
-        string GenerateToken(ApplicationUser user, IList<string> roles, IEnumerable<string> permissions);
+        string GenerateToken(ApplicationUser user, string tid, IList<string> roles, IEnumerable<string> permissions);
     }
 }

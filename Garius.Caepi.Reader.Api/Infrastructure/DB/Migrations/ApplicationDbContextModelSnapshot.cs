@@ -93,6 +93,12 @@ namespace Garius.Caepi.Reader.Api.Infrastructure.DB.Migrations
                         .IsConcurrencyToken()
                         .HasColumnType("text");
 
+                    b.Property<string>("CpfEncrypted")
+                        .HasColumnType("text");
+
+                    b.Property<string>("CpfHash")
+                        .HasColumnType("text");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -102,6 +108,14 @@ namespace Garius.Caepi.Reader.Api.Infrastructure.DB.Migrations
 
                     b.Property<bool>("EmailConfirmed")
                         .HasColumnType("boolean");
+
+                    b.Property<string>("EmailEncrypted")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("EmailHash")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<bool>("Enabled")
                         .HasColumnType("boolean");
@@ -151,9 +165,6 @@ namespace Garius.Caepi.Reader.Api.Infrastructure.DB.Migrations
                     b.Property<string>("SecurityStamp")
                         .HasColumnType("text");
 
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
                     b.Property<bool>("TwoFactorEnabled")
                         .HasColumnType("boolean");
 
@@ -166,14 +177,15 @@ namespace Garius.Caepi.Reader.Api.Infrastructure.DB.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("EmailHash")
+                        .IsUnique();
+
                     b.HasIndex("NormalizedEmail")
                         .HasDatabaseName("EmailIndex");
 
                     b.HasIndex("NormalizedUserName")
                         .IsUnique()
                         .HasDatabaseName("UserNameIndex");
-
-                    b.HasIndex("TenantId");
 
                     b.ToTable("AspNetUsers", (string)null);
                 });
@@ -235,6 +247,9 @@ namespace Garius.Caepi.Reader.Api.Infrastructure.DB.Migrations
                     b.Property<DateTime?>("RevokedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Token")
                         .IsRequired()
                         .HasColumnType("text");
@@ -246,6 +261,8 @@ namespace Garius.Caepi.Reader.Api.Infrastructure.DB.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("TenantId");
 
                     b.HasIndex("Token")
                         .IsUnique();
@@ -267,9 +284,6 @@ namespace Garius.Caepi.Reader.Api.Infrastructure.DB.Migrations
                     b.Property<bool>("Enabled")
                         .HasColumnType("boolean");
 
-                    b.Property<bool>("IsDummy")
-                        .HasColumnType("boolean");
-
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text");
@@ -280,6 +294,38 @@ namespace Garius.Caepi.Reader.Api.Infrastructure.DB.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("AspNetTenants", (string)null);
+                });
+
+            modelBuilder.Entity("Garius.Caepi.Reader.Api.Domain.Entities.UserTenant", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("RoleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("UserId", "TenantId");
+
+                    b.HasIndex("RoleId");
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("AspNetUserTenants", (string)null);
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserLogin<System.Guid>", b =>
@@ -333,17 +379,6 @@ namespace Garius.Caepi.Reader.Api.Infrastructure.DB.Migrations
                     b.Navigation("Role");
                 });
 
-            modelBuilder.Entity("Garius.Caepi.Reader.Api.Domain.Entities.Identity.ApplicationUser", b =>
-                {
-                    b.HasOne("Garius.Caepi.Reader.Api.Domain.Entities.Tenant", "Tenant")
-                        .WithMany("Users")
-                        .HasForeignKey("TenantId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Tenant");
-                });
-
             modelBuilder.Entity("Garius.Caepi.Reader.Api.Domain.Entities.Identity.ApplicationUserClaim", b =>
                 {
                     b.HasOne("Garius.Caepi.Reader.Api.Domain.Entities.Identity.ApplicationUser", "User")
@@ -376,11 +411,46 @@ namespace Garius.Caepi.Reader.Api.Infrastructure.DB.Migrations
 
             modelBuilder.Entity("Garius.Caepi.Reader.Api.Domain.Entities.Identity.RefreshToken", b =>
                 {
+                    b.HasOne("Garius.Caepi.Reader.Api.Domain.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.HasOne("Garius.Caepi.Reader.Api.Domain.Entities.Identity.ApplicationUser", "User")
                         .WithMany("RefreshTokens")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Tenant");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Garius.Caepi.Reader.Api.Domain.Entities.UserTenant", b =>
+                {
+                    b.HasOne("Garius.Caepi.Reader.Api.Domain.Entities.Identity.ApplicationRole", "Role")
+                        .WithMany()
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Garius.Caepi.Reader.Api.Domain.Entities.Tenant", "Tenant")
+                        .WithMany("UserMemberships")
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Garius.Caepi.Reader.Api.Domain.Entities.Identity.ApplicationUser", "User")
+                        .WithMany("TenantMemberships")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Role");
+
+                    b.Navigation("Tenant");
 
                     b.Navigation("User");
                 });
@@ -416,12 +486,14 @@ namespace Garius.Caepi.Reader.Api.Infrastructure.DB.Migrations
 
                     b.Navigation("RefreshTokens");
 
+                    b.Navigation("TenantMemberships");
+
                     b.Navigation("UserRoles");
                 });
 
             modelBuilder.Entity("Garius.Caepi.Reader.Api.Domain.Entities.Tenant", b =>
                 {
-                    b.Navigation("Users");
+                    b.Navigation("UserMemberships");
                 });
 #pragma warning restore 612, 618
         }

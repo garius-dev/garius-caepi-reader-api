@@ -34,7 +34,6 @@ namespace Garius.Caepi.Reader.Api.Infrastructure.DB.Migrations
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     Name = table.Column<string>(type: "text", nullable: false),
-                    IsDummy = table.Column<bool>(type: "boolean", nullable: false),
                     Enabled = table.Column<bool>(type: "boolean", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
@@ -42,6 +41,42 @@ namespace Garius.Caepi.Reader.Api.Infrastructure.DB.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_AspNetTenants", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "AspNetUsers",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    FirstName = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    LastName = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    FullName = table.Column<string>(type: "character varying(201)", maxLength: 201, nullable: false),
+                    NormalizedFullName = table.Column<string>(type: "text", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    Enabled = table.Column<bool>(type: "boolean", nullable: false),
+                    EmailEncrypted = table.Column<string>(type: "text", nullable: false),
+                    EmailHash = table.Column<string>(type: "text", nullable: false),
+                    CpfEncrypted = table.Column<string>(type: "text", nullable: true),
+                    CpfHash = table.Column<string>(type: "text", nullable: true),
+                    UserName = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                    NormalizedUserName = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                    Email = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                    NormalizedEmail = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                    EmailConfirmed = table.Column<bool>(type: "boolean", nullable: false),
+                    PasswordHash = table.Column<string>(type: "text", nullable: true),
+                    SecurityStamp = table.Column<string>(type: "text", nullable: true),
+                    ConcurrencyStamp = table.Column<string>(type: "text", nullable: true),
+                    PhoneNumber = table.Column<string>(type: "text", nullable: true),
+                    PhoneNumberConfirmed = table.Column<bool>(type: "boolean", nullable: false),
+                    TwoFactorEnabled = table.Column<bool>(type: "boolean", nullable: false),
+                    LockoutEnd = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    LockoutEnabled = table.Column<bool>(type: "boolean", nullable: false),
+                    AccessFailedCount = table.Column<int>(type: "integer", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_AspNetUsers", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -61,45 +96,6 @@ namespace Garius.Caepi.Reader.Api.Infrastructure.DB.Migrations
                         name: "FK_AspNetRoleClaims_AspNetRoles_RoleId",
                         column: x => x.RoleId,
                         principalTable: "AspNetRoles",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "AspNetUsers",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    FirstName = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
-                    LastName = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
-                    FullName = table.Column<string>(type: "character varying(201)", maxLength: 201, nullable: false),
-                    NormalizedFullName = table.Column<string>(type: "text", nullable: false),
-                    TenantId = table.Column<Guid>(type: "uuid", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    Enabled = table.Column<bool>(type: "boolean", nullable: false),
-                    UserName = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
-                    NormalizedUserName = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
-                    Email = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
-                    NormalizedEmail = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
-                    EmailConfirmed = table.Column<bool>(type: "boolean", nullable: false),
-                    PasswordHash = table.Column<string>(type: "text", nullable: true),
-                    SecurityStamp = table.Column<string>(type: "text", nullable: true),
-                    ConcurrencyStamp = table.Column<string>(type: "text", nullable: true),
-                    PhoneNumber = table.Column<string>(type: "text", nullable: true),
-                    PhoneNumberConfirmed = table.Column<bool>(type: "boolean", nullable: false),
-                    TwoFactorEnabled = table.Column<bool>(type: "boolean", nullable: false),
-                    LockoutEnd = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    LockoutEnabled = table.Column<bool>(type: "boolean", nullable: false),
-                    AccessFailedCount = table.Column<int>(type: "integer", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_AspNetUsers", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_AspNetUsers_AspNetTenants_TenantId",
-                        column: x => x.TenantId,
-                        principalTable: "AspNetTenants",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
@@ -151,6 +147,7 @@ namespace Garius.Caepi.Reader.Api.Infrastructure.DB.Migrations
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     UserId = table.Column<Guid>(type: "uuid", nullable: false),
+                    TenantId = table.Column<Guid>(type: "uuid", nullable: false),
                     Token = table.Column<string>(type: "text", nullable: false),
                     ExpiresAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     RevokedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
@@ -161,6 +158,12 @@ namespace Garius.Caepi.Reader.Api.Infrastructure.DB.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_AspNetUserRefreshTokens", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_AspNetUserRefreshTokens_AspNetTenants_TenantId",
+                        column: x => x.TenantId,
+                        principalTable: "AspNetTenants",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
                         name: "FK_AspNetUserRefreshTokens_AspNetUsers_UserId",
                         column: x => x.UserId,
@@ -187,6 +190,41 @@ namespace Garius.Caepi.Reader.Api.Infrastructure.DB.Migrations
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
                         name: "FK_AspNetUserRoles_AspNetUsers_UserId",
+                        column: x => x.UserId,
+                        principalTable: "AspNetUsers",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "AspNetUserTenants",
+                columns: table => new
+                {
+                    UserId = table.Column<Guid>(type: "uuid", nullable: false),
+                    TenantId = table.Column<Guid>(type: "uuid", nullable: false),
+                    RoleId = table.Column<Guid>(type: "uuid", nullable: false),
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    Enabled = table.Column<bool>(type: "boolean", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_AspNetUserTenants", x => new { x.UserId, x.TenantId });
+                    table.ForeignKey(
+                        name: "FK_AspNetUserTenants_AspNetRoles_RoleId",
+                        column: x => x.RoleId,
+                        principalTable: "AspNetRoles",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_AspNetUserTenants_AspNetTenants_TenantId",
+                        column: x => x.TenantId,
+                        principalTable: "AspNetTenants",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_AspNetUserTenants_AspNetUsers_UserId",
                         column: x => x.UserId,
                         principalTable: "AspNetUsers",
                         principalColumn: "Id",
@@ -235,6 +273,11 @@ namespace Garius.Caepi.Reader.Api.Infrastructure.DB.Migrations
                 column: "UserId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_AspNetUserRefreshTokens_TenantId",
+                table: "AspNetUserRefreshTokens",
+                column: "TenantId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_AspNetUserRefreshTokens_Token",
                 table: "AspNetUserRefreshTokens",
                 column: "Token",
@@ -256,15 +299,26 @@ namespace Garius.Caepi.Reader.Api.Infrastructure.DB.Migrations
                 column: "NormalizedEmail");
 
             migrationBuilder.CreateIndex(
-                name: "IX_AspNetUsers_TenantId",
+                name: "IX_AspNetUsers_EmailHash",
                 table: "AspNetUsers",
-                column: "TenantId");
+                column: "EmailHash",
+                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "UserNameIndex",
                 table: "AspNetUsers",
                 column: "NormalizedUserName",
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_AspNetUserTenants_RoleId",
+                table: "AspNetUserTenants",
+                column: "RoleId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_AspNetUserTenants_TenantId",
+                table: "AspNetUserTenants",
+                column: "TenantId");
         }
 
         /// <inheritdoc />
@@ -286,16 +340,19 @@ namespace Garius.Caepi.Reader.Api.Infrastructure.DB.Migrations
                 name: "AspNetUserRoles");
 
             migrationBuilder.DropTable(
+                name: "AspNetUserTenants");
+
+            migrationBuilder.DropTable(
                 name: "AspNetUserTokens");
 
             migrationBuilder.DropTable(
                 name: "AspNetRoles");
 
             migrationBuilder.DropTable(
-                name: "AspNetUsers");
+                name: "AspNetTenants");
 
             migrationBuilder.DropTable(
-                name: "AspNetTenants");
+                name: "AspNetUsers");
         }
     }
 }

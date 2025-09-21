@@ -13,6 +13,7 @@
     <PackageReference Include="AspNetCore.HealthChecks.NpgSql" Version="9.0.0" />
     <PackageReference Include="AspNetCore.HealthChecks.Redis" Version="9.0.0" />
     <PackageReference Include="Google.Cloud.SecretManager.V1" Version="2.6.0" />
+    <PackageReference Include="HtmlSanitizer" Version="9.0.886" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.Google" Version="8.0.20" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.20" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.MicrosoftAccount" Version="8.0.20" />
@@ -56,6 +57,23 @@
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
     </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Infrastructure\Auth\Interfaces\" />
+    <Folder Include="Infrastructure\DB\Migrations\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="EmailTemplates\EmailConfirmation.html">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="EmailTemplates\PasswordReset.html">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="EmailTemplates\UserInvitation.html">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>

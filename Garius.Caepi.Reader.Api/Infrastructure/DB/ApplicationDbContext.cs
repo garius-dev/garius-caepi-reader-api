@@ -19,10 +19,13 @@ namespace Garius.Caepi.Reader.Api.Infrastructure.DB
         ApplicationRoleClaim,
         IdentityUserToken<Guid>>
     {
+        private readonly ITenantService _tenantService;
+
+
         public DbSet<Tenant> Tenants { get; set; }
+        public DbSet<UserTenant> UserTenants { get; set; }
         public DbSet<RefreshToken> RefreshTokens { get; set; }
 
-        private readonly ITenantService _tenantService;
 
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options, ITenantService tenantService) : base(options)
         {
@@ -33,88 +36,87 @@ namespace Garius.Caepi.Reader.Api.Infrastructure.DB
         {
             base.OnModelCreating(builder);
 
-            // ### FILTRO DE QUERY GLOBAL PARA MULTI-TENANCY ###
+            // Filtro Global Automático
             foreach (var entityType in builder.Model.GetEntityTypes())
             {
-                // Verifica se a entidade implementa a nossa interface de tenant
-                if (typeof(ITenantEntity).IsAssignableFrom(entityType.ClrType))
+                if (entityType.ClrType.Assembly != typeof(ApplicationUser).Assembly) continue;
+
+                bool isTenantEntity = typeof(ITenantEntity).IsAssignableFrom(entityType.ClrType);
+                bool isBaseEntity = typeof(IBaseEntity).IsAssignableFrom(entityType.ClrType);
+
+                if (!isTenantEntity && !isBaseEntity) continue;
+
+                var parameter = Expression.Parameter(entityType.ClrType, "e");
+                Expression? finalFilter = null;
+
+                if (isTenantEntity && entityType.ClrType != typeof(Tenant))
                 {
-                    // Constrói a expressão de filtro: e => e.TenantId == _tenantService.GetTenantId()
-                    var parameter = Expression.Parameter(entityType.ClrType, "e");
-                    var property = Expression.Property(parameter, nameof(ITenantEntity.TenantId));
+                    var tenantProperty = Expression.Property(parameter, nameof(ITenantEntity.TenantId));
                     var tenantId = Expression.Constant(_tenantService.GetTenantId());
-                    var tenantFilter = Expression.Equal(property, tenantId);
-
-                    // Aplica o filtro de SOFT-DELETE (Enabled)
-                    if (typeof(IBaseEntity).IsAssignableFrom(entityType.ClrType))
-                    {
-                        var enabledProperty = Expression.Property(parameter, nameof(IBaseEntity.Enabled));
-                        var enabledFilter = Expression.Equal(enabledProperty, Expression.Constant(true));
-
-                        // Combina os dois filtros: e.TenantId == tenantId && e.Enabled == true
-                        var combinedFilter = Expression.AndAlso(tenantFilter, enabledFilter);
-                        var lambda = Expression.Lambda(combinedFilter, parameter);
-                        builder.Entity(entityType.ClrType).HasQueryFilter(lambda);
-                    }
-                    else
-                    {
-                        // Se não for IBaseEntity, aplica apenas o filtro de tenant
-                        var lambda = Expression.Lambda(tenantFilter, parameter);
-                        builder.Entity(entityType.ClrType).HasQueryFilter(lambda);
-                    }
+                    finalFilter = Expression.Equal(tenantProperty, tenantId);
                 }
-                else if (typeof(IBaseEntity).IsAssignableFrom(entityType.ClrType))
+
+                if (isBaseEntity)
                 {
-                    var parameter = Expression.Parameter(entityType.ClrType, "e");
-                    var property = Expression.Property(parameter, nameof(IBaseEntity.Enabled));
-                    var body = Expression.Equal(property, Expression.Constant(true));
-                    var lambda = Expression.Lambda(body, parameter);
-                    builder.Entity(entityType.ClrType).HasQueryFilter(lambda);
+                    var enabledProperty = Expression.Property(parameter, nameof(IBaseEntity.Enabled));
+                    var enabledFilter = Expression.Equal(enabledProperty, Expression.Constant(true));
+                    finalFilter = finalFilter == null ? enabledFilter : Expression.AndAlso(finalFilter, enabledFilter);
+                }
+
+                if (finalFilter != null)
+                {
+                    builder.Entity(entityType.ClrType).HasQueryFilter(Expression.Lambda(finalFilter, parameter));
                 }
             }
+
+            // Configuração dos Relacionamentos, Nomes de Tabela e ÍNDICES
+            builder.Entity<Tenant>(e =>
+            {
+                e.ToTable("AspNetTenants");
+            });
+
+            builder.Entity<ApplicationUser>(e =>
+            {
+                // Índices para busca rápida e para garantir unicidade de dados sensíveis.
+                e.HasIndex(u => u.EmailHash).IsUnique();
+
+                // Garante que o CpfHash seja único, mas permite múltiplos usuários com CPF nulo.
+                //e.HasIndex(u => u.CpfHash).IsUnique().HasFilter("\"CpfHash\" IS NOT NULL");
+
+                // Configuração das relações
+                e.HasMany(u => u.Claims).WithOne(c => c.User).HasForeignKey(c => c.UserId).IsRequired();
+                e.HasMany(u => u.UserRoles).WithOne(ur => ur.User).HasForeignKey(ur => ur.UserId).IsRequired();
+                e.HasMany(u => u.RefreshTokens).WithOne(rt => rt.User).HasForeignKey(rt => rt.UserId);
+                e.HasMany(u => u.TenantMemberships).WithOne(ut => ut.User).HasForeignKey(ut => ut.UserId);
+            });
+
+            builder.Entity<ApplicationRole>(b =>
+            {
+                b.HasMany(r => r.Claims).WithOne(rc => rc.Role).HasForeignKey(rc => rc.RoleId).IsRequired();
+                b.HasMany(r => r.UserRoles).WithOne(ur => ur.Role).HasForeignKey(ur => ur.RoleId).IsRequired();
+            });
+
+            builder.Entity<UserTenant>(e =>
+            {
+                e.ToTable("AspNetUserTenants");
+                e.HasKey(ut => new { ut.UserId, ut.TenantId });
+
+                // Índice para otimizar a busca de "todos os usuários de um tenant".
+                e.HasIndex(ut => ut.TenantId);
+
+                // Configuração das relações
+                e.HasOne(ut => ut.User).WithMany(u => u.TenantMemberships).HasForeignKey(ut => ut.UserId);
+                e.HasOne(ut => ut.Tenant).WithMany(t => t.UserMemberships).HasForeignKey(ut => ut.TenantId);
+                e.HasOne(ut => ut.Role).WithMany().HasForeignKey(ut => ut.RoleId);
+            });
 
             builder.Entity<RefreshToken>(e =>
             {
                 e.ToTable("AspNetUserRefreshTokens");
                 e.HasIndex(rt => rt.Token).IsUnique();
-            });
 
-            builder.Entity<ApplicationRole>(b =>
-            {
-                b.HasMany(r => r.UserRoles)
-                 .WithOne(ur => ur.Role)
-                 .HasForeignKey(ur => ur.RoleId);
-            });
-
-            builder.Entity<ApplicationUserClaim>()
-                .HasOne(c => c.User)
-                .WithMany(u => u.Claims)
-                .HasForeignKey(c => c.UserId);
-
-            builder.Entity<ApplicationRoleClaim>()
-                .HasOne(rc => rc.Role)
-                .WithMany(r => r.Claims)
-                .HasForeignKey(rc => rc.RoleId);
-
-            builder.Entity<ApplicationUser>(e =>
-            {
-                e.HasMany(u => u.UserRoles)
-                 .WithOne(ur => ur.User)
-                 .HasForeignKey(ur => ur.UserId);
-
-                e.HasMany(u => u.RefreshTokens)
-                .WithOne(rt => rt.User)
-                .HasForeignKey(rt => rt.UserId);
-
-                e.HasOne(u => u.Tenant)
-                .WithMany(t => t.Users)
-                .HasForeignKey(u => u.TenantId)
-                .IsRequired();
-            });
-
-            builder.Entity<Tenant>(e =>
-            {
-                e.ToTable("AspNetTenants");
+                e.HasOne(rt => rt.User).WithMany(u => u.RefreshTokens).HasForeignKey(rt => rt.UserId).OnDelete(DeleteBehavior.Cascade);
+                e.HasOne(rt => rt.Tenant).WithMany().HasForeignKey(rt => rt.TenantId).OnDelete(DeleteBehavior.Cascade);
             });
         }
     }

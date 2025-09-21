@@ -9,9 +9,30 @@ namespace Garius.Caepi.Reader.Api.Infrastructure.DB.Extensions
     {
         public static async Task SeedRolesAndPermissionsAsync(IServiceProvider serviceProvider)
         {
-            var roleManager = serviceProvider.GetRequiredService<RoleManager<ApplicationRole>>();
-            var allPermissions = DbConstants.GetAllPermissions();
+            using var scope = serviceProvider.CreateScope();
+            var scopedProvider = scope.ServiceProvider;
 
+            var configuration = serviceProvider.GetRequiredService<IConfiguration>();
+            var defaultTenant = configuration["TenantSettings:DefaultTenantId"];
+
+            var dbContext = scopedProvider.GetRequiredService<ApplicationDbContext>();
+            var roleManager = serviceProvider.GetRequiredService<RoleManager<ApplicationRole>>();
+
+            var existingTenant = dbContext.Tenants.Find(Guid.Parse(defaultTenant!));
+            if (existingTenant == null)
+            {
+                dbContext.Tenants.Add(new Domain.Entities.Tenant()
+                {
+                    Id = Guid.Parse(defaultTenant!),
+                    Enabled = true,
+                    Name = "Garius Tech",
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow,
+                });
+                await dbContext.SaveChangesAsync();
+            }
+
+            var allPermissions = DbConstants.GetAllPermissions();
             foreach (var roleName in DbConstants.SystemRoles.SuperUserRoles)
             {
                 var role = await roleManager.FindByNameAsync(roleName);

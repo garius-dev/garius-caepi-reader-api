@@ -1,4 +1,4 @@
-﻿using Garius.Caepi.Reader.Api.Application.DTOs.System;
+﻿using Garius.Caepi.Reader.Api.Application.DTOs;
 using Garius.Caepi.Reader.Api.Exceptions;
 using System.Text.Json;
 

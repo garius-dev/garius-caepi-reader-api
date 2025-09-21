@@ -77,6 +77,7 @@ builder.Services.AddValidatedSettings<ResendSettings>(builder.Configuration, "Re
 builder.Services.AddValidatedSettings<JwtSettings>(builder.Configuration, "JwtSettings");
 builder.Services.AddValidatedSettings<RedisSettings>(builder.Configuration, "RedisSettings");
 builder.Services.AddValidatedSettings<AppKeyManagementSettings>(builder.Configuration, "AppKeyManagementSettings");
+builder.Services.AddValidatedSettings<TenantSettings>(builder.Configuration, "TenantSettings");
 
 // --- CONFIGURAÇÃO DE CONEXÃO DO REDIS E DB ---
 var redisSettings = builder.Configuration.GetSection("RedisSettings").Get<RedisSettings>()!;
@@ -210,7 +211,7 @@ builder.Services
         // Configurações de usuário
         options.User.AllowedUserNameCharacters =
             "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._@+";
-        options.User.RequireUniqueEmail = true;
+        options.User.RequireUniqueEmail = false;
 
         // Configurações de SignIn
         options.SignIn.RequireConfirmedAccount = true;

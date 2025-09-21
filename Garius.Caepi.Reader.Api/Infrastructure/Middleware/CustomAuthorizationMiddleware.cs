@@ -1,4 +1,4 @@
-﻿using Garius.Caepi.Reader.Api.Application.DTOs.System;
+﻿using Garius.Caepi.Reader.Api.Application.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authorization.Policy;
 
@@ -12,7 +12,7 @@ namespace Garius.Caepi.Reader.Api.Infrastructure.Middleware
         {
             if (authorizeResult.Succeeded)
             {
-                await next(context).ConfigureAwait(false);
+                await next(context);
                 return;
             }
 
@@ -28,7 +28,7 @@ namespace Garius.Caepi.Reader.Api.Infrastructure.Middleware
 
             context.Response.StatusCode = response.StatusCode;
             context.Response.ContentType = "application/json";
-            await context.Response.WriteAsJsonAsync(response).ConfigureAwait(false);
+            await context.Response.WriteAsJsonAsync(response);
         }
     }
 }

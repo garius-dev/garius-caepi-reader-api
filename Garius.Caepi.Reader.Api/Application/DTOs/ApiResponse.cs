@@ -1,4 +1,4 @@
-﻿namespace Garius.Caepi.Reader.Api.Application.DTOs.System
+﻿namespace Garius.Caepi.Reader.Api.Application.DTOs
 {
     public class ApiResponse<T>
     {

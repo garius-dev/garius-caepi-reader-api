@@ -6,7 +6,6 @@ namespace Garius.Caepi.Reader.Api.Domain.Entities
     public class Tenant : BaseEntity
     {
         public string Name { get; set; } = string.Empty;
-        public bool IsDummy { get; set; } = false;
-        public virtual ICollection<ApplicationUser> Users { get; set; } = new List<ApplicationUser>();
+        public virtual ICollection<UserTenant> UserMemberships { get; set; } = new List<UserTenant>();
     }
 }
