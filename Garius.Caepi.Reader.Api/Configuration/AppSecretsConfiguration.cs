@@ -5,6 +5,17 @@ namespace Garius.Caepi.Reader.Api.Configuration
 {
     public static class AppSecretsConfiguration
     {
+        public class UrlSettings
+        {
+            public string FrontendBaseUrl { get; set; } = string.Empty;
+
+            public string EmailConfirmationPath { get; set; } = "/confirm-email";
+            public string PasswordResetPath { get; set; } = "/reset-password";
+            public string InvitationPath { get; set; } = "/register-from-invite";
+            public string ValidateInvitationPath { get; set; } = "/intivations/validate";
+            public string TenantEmailConfirmationPath { get; set; } = "/confirm-email";
+        }
+
         public class JwtSettings
         {
             [Required(ErrorMessage = "A chave secreta do JWT ('Secret') é obrigatória.")]

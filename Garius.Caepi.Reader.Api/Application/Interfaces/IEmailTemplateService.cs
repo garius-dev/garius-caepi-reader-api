@@ -4,6 +4,6 @@
     {
         Task<string> GetEmailConfirmationTemplateAsync(string userName, string confirmationLink);
         Task<string> GetPasswordResetTemplateAsync(string userName, string resetLink);
-        Task<string> GetUserInvitationTemplateAsync(string tenantName, string invitationLink);
+        Task<string> GetUserInvitationTemplateAsync(string tenantName, string userName, string invitationLink);
     }
 }

@@ -61,12 +61,13 @@ namespace Garius.Caepi.Reader.Api.Application.Services
             return LoadAndPopulateTemplate("PasswordReset.html", placeholders);
         }
 
-        public Task<string> GetUserInvitationTemplateAsync(string tenantName, string invitationLink)
+        public Task<string> GetUserInvitationTemplateAsync(string tenantName, string userName, string invitationLink)
         {
             var placeholders = new Dictionary<string, string>
             {
                 { "TenantName", tenantName },
-                { "InvitationLink", invitationLink }
+                { "UserName", userName },
+                { "InvitationLink", invitationLink },
             };
             return LoadAndPopulateTemplate("UserInvitation.html", placeholders);
         }

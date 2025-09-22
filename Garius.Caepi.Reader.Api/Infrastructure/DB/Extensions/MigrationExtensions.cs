@@ -7,6 +7,26 @@ namespace Garius.Caepi.Reader.Api.Infrastructure.DB.Extensions
 {
     public static class MigrationExtensions
     {
+        public static async Task SeedRolesAndClaimsAsync(WebApplication app)
+        {
+            try
+            {
+                using var scope = app.Services.CreateScope();
+                var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+                Log.Information("Running Roles and Claims creation...");
+                await ApplicationDbContextSeederExtensions.SeedRolesAndPermissionsAsync(scope.ServiceProvider);
+                Log.Information("Roles and Claims creation completed successfully.");
+
+            }
+            catch (Exception ex)
+            {
+                Log.Fatal(ex, "Seed Roles and Claims process failed.");
+                Log.CloseAndFlush();
+                Environment.Exit(1);
+            }
+        }
+
         public static async Task RunMigrationsAsync(WebApplication app, ConnectionStringSettings connectionStringSettings, bool isDevelopment, bool isDockerRun)
         {
             var rootConnectionString = connectionStringSettings.GetRootConnectionString(isDevelopment, isDockerRun);
@@ -26,8 +46,10 @@ namespace Garius.Caepi.Reader.Api.Infrastructure.DB.Extensions
                 Log.Information("Migrations completed successfully.");
 
                 Log.Information("Running database seed...");
-                await ApplicationDbContextSeederExtensions.SeedRolesAndPermissionsAsync(scope.ServiceProvider);
+                await ApplicationDbContextSeederExtensions.SeedDefaultTenantAsync(scope.ServiceProvider);
                 Log.Information("Database seed completed successfully.");
+
+                await SeedRolesAndClaimsAsync(app);
 
                 await EnsureUsersAndPermissionsAsync(appConnectionString, connectionStringSettings.Database, connectionStringSettings.Users);
             }

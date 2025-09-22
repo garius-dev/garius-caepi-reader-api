@@ -30,21 +30,9 @@ namespace Garius.Caepi.Reader.Api.Controllers
         }
 
         [HttpGet(Name = "GetWeatherForecast")]
-        //[Authorize]
-        public async Task<IEnumerable<WeatherForecast>> Get()
+        [Authorize]
+        public IEnumerable<WeatherForecast> Get()
         {
-            RegisterRequest request = new RegisterRequest()
-            {
-                FirstName = "George",
-                LastName = "Souza",
-                Email = "georgelucas.souza@gmail.com",
-                Password = "Biglok09__@@",
-                ConfirmPassword = "Biglok09__@@"
-            };
-
-            //await _authService.CreateUserAsync(request, true);
-            await _authService.ForgotPasswordAsync(new ForgotPasswordRequest() { Email = request.Email });
-
 
             return Enumerable.Range(1, 5).Select(index => new WeatherForecast
             {

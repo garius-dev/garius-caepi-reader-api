@@ -5,7 +5,10 @@ using Garius.Caepi.Reader.Api.Domain.Interfaces;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using System.Linq.Expressions;
+using System.Reflection.Emit;
+using static Garius.Caepi.Reader.Api.Domain.Constants.DBStatus;
 
 namespace Garius.Caepi.Reader.Api.Infrastructure.DB
 {
@@ -35,6 +38,11 @@ namespace Garius.Caepi.Reader.Api.Infrastructure.DB
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
+
+            var tenantStatusConverter = new ValueConverter<TenantStatus, string>(
+                v => v.Value, // como salvar no banco
+                v => TenantStatus.FromValue(v) // como ler do banco
+            );
 
             // Filtro Global Automático
             foreach (var entityType in builder.Model.GetEntityTypes())
@@ -73,6 +81,9 @@ namespace Garius.Caepi.Reader.Api.Infrastructure.DB
             builder.Entity<Tenant>(e =>
             {
                 e.ToTable("AspNetTenants");
+
+                e.Property(t => t.Status)
+                   .HasConversion(tenantStatusConverter);
             });
 
             builder.Entity<ApplicationUser>(e =>
@@ -101,6 +112,7 @@ namespace Garius.Caepi.Reader.Api.Infrastructure.DB
                 e.ToTable("AspNetUserTenants");
                 e.HasKey(ut => new { ut.UserId, ut.TenantId });
 
+               
                 // Índice para otimizar a busca de "todos os usuários de um tenant".
                 e.HasIndex(ut => ut.TenantId);
 

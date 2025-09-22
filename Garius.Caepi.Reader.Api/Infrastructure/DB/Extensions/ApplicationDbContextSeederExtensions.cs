@@ -1,22 +1,23 @@
 ﻿using Garius.Caepi.Reader.Api.Domain.Constants;
 using Garius.Caepi.Reader.Api.Domain.Entities.Identity;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 
 namespace Garius.Caepi.Reader.Api.Infrastructure.DB.Extensions
 {
     public static class ApplicationDbContextSeederExtensions
     {
-        public static async Task SeedRolesAndPermissionsAsync(IServiceProvider serviceProvider)
+        public static async Task SeedDefaultTenantAsync(IServiceProvider serviceProvider)
         {
             using var scope = serviceProvider.CreateScope();
             var scopedProvider = scope.ServiceProvider;
 
             var configuration = serviceProvider.GetRequiredService<IConfiguration>();
-            var defaultTenant = configuration["TenantSettings:DefaultTenantId"];
 
             var dbContext = scopedProvider.GetRequiredService<ApplicationDbContext>();
-            var roleManager = serviceProvider.GetRequiredService<RoleManager<ApplicationRole>>();
+
+            var defaultTenant = configuration["TenantSettings:DefaultTenantId"];
 
             var existingTenant = dbContext.Tenants.Find(Guid.Parse(defaultTenant!));
             if (existingTenant == null)
@@ -25,38 +26,33 @@ namespace Garius.Caepi.Reader.Api.Infrastructure.DB.Extensions
                 {
                     Id = Guid.Parse(defaultTenant!),
                     Enabled = true,
-                    Name = "Garius Tech",
+                    TradeName = "Garius Tech",
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow,
                 });
                 await dbContext.SaveChangesAsync();
             }
+        }
 
-            var allPermissions = DbConstants.GetAllPermissions();
-            foreach (var roleName in DbConstants.SystemRoles.SuperUserRoles)
+        public static async Task SeedRolesAndPermissionsAsync(IServiceProvider serviceProvider)
+        {
+            using var scope = serviceProvider.CreateScope();
+            var scopedProvider = scope.ServiceProvider;          
+
+            var roleManager = serviceProvider.GetRequiredService<RoleManager<ApplicationRole>>();
+
+            foreach (var roleName in SystemRoles.All)
             {
-                var role = await roleManager.FindByNameAsync(roleName);
-                if (role == null)
+                if (!await roleManager.RoleExistsAsync(roleName))
                 {
-                    role = new ApplicationRole(roleName, $"{roleName} role with all permissions.", 0);
+                    var role = new ApplicationRole { Name = roleName };
                     await roleManager.CreateAsync(role);
-                }
 
-                var currentClaims = await roleManager.GetClaimsAsync(role);
-                var currentPermissions = currentClaims.Where(c => c.Type == "permission").Select(c => c.Value).ToHashSet();
-
-                foreach (var permission in allPermissions)
-                {
-                    if (!currentPermissions.Contains(permission))
+                    if (roleName.IsSuperUser)
                     {
-                        await roleManager.AddClaimAsync(role, new Claim("permission", permission));
+                        await roleManager.AddClaimAsync(role, new Claim("permission", "*"));
                     }
                 }
-            }
-
-            if (await roleManager.FindByNameAsync(DbConstants.SystemRoles.Basic) == null)
-            {
-                await roleManager.CreateAsync(new ApplicationRole(DbConstants.SystemRoles.Basic, "Basic user role with default permissions.", 10));
             }
         }
     }

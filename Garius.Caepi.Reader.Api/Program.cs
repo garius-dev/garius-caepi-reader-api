@@ -1,6 +1,7 @@
 using Asp.Versioning;
 using Asp.Versioning.ApiExplorer;
 using Garius.Caepi.Reader.Api.Configuration;
+using Garius.Caepi.Reader.Api.Domain.Constants;
 using Garius.Caepi.Reader.Api.Domain.Entities.Identity;
 using Garius.Caepi.Reader.Api.Extensions;
 using Garius.Caepi.Reader.Api.Infrastructure.DB;
@@ -22,6 +23,7 @@ using System.Text.Json;
 using static Garius.Caepi.Reader.Api.Configuration.AppSecretsConfiguration;
 
 var builder = WebApplication.CreateBuilder(args);
+
 
 // --- CONFIGURAÇÃO DAS VARIÁVEIS DE AMBIENTE ---
 var enableHttpsRedirect =
@@ -78,6 +80,7 @@ builder.Services.AddValidatedSettings<JwtSettings>(builder.Configuration, "JwtSe
 builder.Services.AddValidatedSettings<RedisSettings>(builder.Configuration, "RedisSettings");
 builder.Services.AddValidatedSettings<AppKeyManagementSettings>(builder.Configuration, "AppKeyManagementSettings");
 builder.Services.AddValidatedSettings<TenantSettings>(builder.Configuration, "TenantSettings");
+builder.Services.AddValidatedSettings<UrlSettings>(builder.Configuration, "UrlSettings");
 
 // --- CONFIGURAÇÃO DE CONEXÃO DO REDIS E DB ---
 var redisSettings = builder.Configuration.GetSection("RedisSettings").Get<RedisSettings>()!;
@@ -291,6 +294,8 @@ if (migrateOnly)
     Log.Information("Running in migration-only mode...");
     await MigrationExtensions.RunMigrationsAsync(app, connectionStringSettings, builder.Environment.IsDevelopment(), isDockerRun);
 }
+
+await MigrationExtensions.SeedRolesAndClaimsAsync(app);
 
 // --- CONFIGURAÇÃO DO SWAGGER UI ---
 var provider = app.Services.GetRequiredService<IApiVersionDescriptionProvider>();

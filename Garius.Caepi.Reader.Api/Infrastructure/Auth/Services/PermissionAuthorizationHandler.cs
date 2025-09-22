@@ -1,5 +1,4 @@
 ﻿using Microsoft.AspNetCore.Authorization;
-using static Garius.Caepi.Reader.Api.Domain.Constants.DbConstants;
 
 namespace Garius.Caepi.Reader.Api.Infrastructure.Auth.Services
 {
@@ -8,7 +7,7 @@ namespace Garius.Caepi.Reader.Api.Infrastructure.Auth.Services
         protected override Task HandleRequirementAsync(AuthorizationHandlerContext context, PermissionRequirement requirement)
         {
             // Concede acesso imediato se o usuário tiver uma das roles de super usuário.
-            if (SystemRoles.SuperUserRoles.Any(role => context.User.IsInRole(role)))
+            if (context.User.HasClaim(c => c.Type == "permission" && c.Value == "*"))
             {
                 context.Succeed(requirement);
                 return Task.CompletedTask;

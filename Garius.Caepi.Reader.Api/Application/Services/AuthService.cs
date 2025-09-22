@@ -1,17 +1,16 @@
-﻿using AngleSharp.Css;
-using Garius.Caepi.Reader.Api.Application.DTOs;
+﻿using Garius.Caepi.Reader.Api.Application.DTOs;
 using Garius.Caepi.Reader.Api.Application.Interfaces;
-using Garius.Caepi.Reader.Api.Domain.Entities;
 using Garius.Caepi.Reader.Api.Domain.Entities.Identity;
 using Garius.Caepi.Reader.Api.Exceptions;
 using Garius.Caepi.Reader.Api.Extensions;
 using Garius.Caepi.Reader.Api.Infrastructure.DB;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using System.Security.Claims;
 using static Garius.Caepi.Reader.Api.Configuration.AppSecretsConfiguration;
-using static Garius.Caepi.Reader.Api.Domain.Constants.DbConstants;
 
 namespace Garius.Caepi.Reader.Api.Application.Services
 {
@@ -27,6 +26,7 @@ namespace Garius.Caepi.Reader.Api.Application.Services
         private readonly ICacheService _cacheService;
         private readonly ITenantService _tenantService;
         private readonly IEmailSender _emailSender;
+        private readonly UrlSettings _urlSettings;
 
         public AuthService(
             IOptions<AppKeyManagementSettings> appKeyManagementSettings,
@@ -37,6 +37,7 @@ namespace Garius.Caepi.Reader.Api.Application.Services
             IJwtTokenService jwtTokenService,
             ICacheService cacheService,
             ITenantService tenantService,
+            IOptions<UrlSettings> urlSettings,
             IEmailSender emailSender)
         {
             _appKeyManagementSettings = appKeyManagementSettings.Value;
@@ -49,6 +50,14 @@ namespace Garius.Caepi.Reader.Api.Application.Services
             _tenantService = tenantService;
             _roleManager = roleManager;
             _emailSender = emailSender;
+            _urlSettings = urlSettings.Value;
+        }
+
+        private class LoginPayload
+        {
+            public Guid UserId { get; set; }
+            public IList<string> Roles { get; set; } = new List<string>();
+            public IList<Claim> Claims { get; set; } = new List<Claim>();
         }
 
         //public async void xxx()
@@ -61,8 +70,6 @@ namespace Garius.Caepi.Reader.Api.Application.Services
 
         //        try
         //        {
-
-
         //            await transaction.CommitAsync();
         //        }
         //        catch (Exception)
@@ -80,11 +87,12 @@ namespace Garius.Caepi.Reader.Api.Application.Services
             ApplicationUser? user = await _userManager.Users
                 .FirstOrDefaultAsync(u => u.EmailHash == emailEncrypt.textHash);
 
-            if(user != null)
+            if (user != null)
                 throw new ValidationException("Usuário já cadastrado.");
 
             user = new ApplicationUser
             {
+                Id = Guid.NewGuid(),
                 UserName = Guid.NewGuid().ToString(),
                 EmailEncrypted = emailEncrypt.encryptedText,
                 EmailHash = emailEncrypt.textHash,
@@ -102,54 +110,17 @@ namespace Garius.Caepi.Reader.Api.Application.Services
             {
                 var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
                 var encodedToken = token.Base64UrlEncode();
-                SendConfirmationEmailInBackground("https://localhost:7090/api/v1/weatherforecast", "/confirm-email", request.Email, user.FirstName, user.Id.ToString(), encodedToken);
+
+                SendConfirmationEmailInBackground(
+                    _urlSettings.FrontendBaseUrl,
+                    _urlSettings.EmailConfirmationPath,
+                    request.Email,
+                    user.FirstName,
+                    user.Id.ToString(),
+                    encodedToken);
             }
 
             return user;
-        }
-
-        public async Task<Tenant> CreateTenantAsync(string tenantName)
-        {
-            Tenant? tenant = await _dbContext.Tenants
-                .FirstOrDefaultAsync(t => t.Name.ToUpper() == tenantName.ToUpper());
-
-            if (tenant != null)
-                throw new ValidationException("Tenant já cadastrado.");
-
-            tenant = new Tenant()
-            {
-                Name = tenantName.SanitizeInput(),
-            };
-
-            _dbContext.Tenants.Add(tenant);
-            await _dbContext.SaveChangesAsync();
-
-            return tenant;
-        }
-
-        public async Task AssignUserToTenantAsync(Guid userId, Guid tenantId, string roleName)
-        {            
-            var role = await _roleManager.FindByNameAsync(roleName);
-
-            if (role == null)
-                throw new NotFoundException("Função não encontrada.");
-
-            var existingMembership = _dbContext.UserTenants
-                .Any(ut => ut.TenantId == tenantId && ut.UserId == userId);
-
-            if (existingMembership)
-                throw new ValidationException("Usuário já foi regustrado.");
-
-            var userTenant = new UserTenant()
-            {
-                UserId = userId,
-                TenantId = tenantId,
-                RoleId = role.Id
-
-            };
-            
-            _dbContext.UserTenants.Add(userTenant);
-            await _dbContext.SaveChangesAsync();
         }
 
         public async Task ConfirmEmailAsync(string userId, string token)
@@ -187,12 +158,19 @@ namespace Garius.Caepi.Reader.Api.Application.Services
             {
                 var token = await _userManager.GeneratePasswordResetTokenAsync(user);
                 var encodedToken = WebEncoders.Base64UrlEncode(System.Text.Encoding.UTF8.GetBytes(token));
-                SendPasswordResetEmailInBackground("https://localhost:7090/api/v1/weatherforecast", "/reset-password", request.Email!, user.FirstName, user.Id.ToString(), encodedToken);
+
+                SendPasswordResetEmailInBackground(
+                    _urlSettings.FrontendBaseUrl,
+                    _urlSettings.PasswordResetPath,
+                    request.Email!,
+                    user.FirstName,
+                    user.Id.ToString(),
+                    encodedToken);
             }
         }
 
         public async Task ResetPasswordAsync(ResetPasswordRequest request)
-        {            
+        {
             var user = await _userManager.FindByIdAsync(request.UserId.ToString());
 
             if (user == null)
@@ -218,6 +196,58 @@ namespace Garius.Caepi.Reader.Api.Application.Services
                 throw new BadRequestException(string.Join("; ", result.Errors.Select(e => e.Description)));
         }
 
+        public ChallengeResult GetExternalLoginChallengeAsync(string provider, string redirectUrl)
+        {
+            var properties = _signInManager.ConfigureExternalAuthenticationProperties(provider, redirectUrl);
+
+            return new ChallengeResult(provider, properties);
+        }
+
+        public async Task<string> ExternalLoginCallbackAsync(string transitionUrl, string? returnUrl)
+        {
+            ExternalLoginInfo info = await _signInManager.GetExternalLoginInfoAsync().ConfigureAwait(false)
+                ?? throw new ValidationException("Não foi possível obter informações do provedor externo.");
+
+            var user = await _userManager.FindByLoginAsync(info.LoginProvider, info.ProviderKey);
+
+            if (user == null)
+            {
+                var email = info.Principal.FindFirstValue(ClaimTypes.Email)
+                    ?? throw new ValidationException("E-mail não fornecido pelo provedor externo.");
+
+                user = await CreateUserAsync(new RegisterRequest
+                {
+                    Email = email,
+                    FirstName = info.Principal.FindFirstValue(ClaimTypes.GivenName) ?? "Usuário",
+                    LastName = info.Principal.FindFirstValue(ClaimTypes.Surname) ?? ""
+                });
+
+                var loginResult = await _userManager.AddLoginAsync(user, info);
+                if (!loginResult.Succeeded)
+                {
+                    var errors = string.Join(", ", loginResult.Errors.Select(e => e.Description));
+                    throw new InvalidOperationAppException($"Falha ao associar login externo: {errors}");
+                }
+            }
+
+            var roles = await _userManager.GetRolesAsync(user).ConfigureAwait(false);
+            var claims = await _userManager.GetClaimsAsync(user).ConfigureAwait(false);
+
+            var code = SecurityExtensions.CreateOneTimeCode();
+            var codeHash = code.ComputeHash();
+
+            await _cacheService.SetAsync(
+                $"ext_code:{codeHash}",
+                new LoginPayload { UserId = user.Id, Roles = roles, Claims = claims },
+                TimeSpan.FromMinutes(1)).ConfigureAwait(false);
+
+            var parts = new List<string> { $"code={Uri.EscapeDataString(code)}" };
+            if (!string.IsNullOrWhiteSpace(returnUrl))
+                parts.Add($"returnUrl={Uri.EscapeDataString(returnUrl)}");
+
+            return $"{transitionUrl}#{string.Join("&", parts)}";
+        }
+
         private void SendConfirmationEmailInBackground(string baseUrl, string emailConfirmationUrl, string email, string userName, string userId, string encodedToken)
         {
             var confirmLink = $"{baseUrl}{emailConfirmationUrl}?userId={userId}&token={encodedToken}";
@@ -232,11 +262,6 @@ namespace Garius.Caepi.Reader.Api.Application.Services
                 templateService => templateService.GetPasswordResetTemplateAsync(userName, resetLink));
         }
 
-        private void SendInvitationEmailInBackground(string baseUrl, string validateInvitationUrl, string email, string tenantName, string encodedToken)
-        {
-            var invitationLink = $"{baseUrl}{validateInvitationUrl}/{encodedToken}";
-            _emailSender.SendEmailInBackground(email, $"Convite para {tenantName}",
-                templateService => templateService.GetUserInvitationTemplateAsync(tenantName, invitationLink));
-        }
+        
     }
 }

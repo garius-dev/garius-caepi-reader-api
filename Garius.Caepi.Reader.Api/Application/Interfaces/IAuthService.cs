@@ -9,8 +9,6 @@ namespace Garius.Caepi.Reader.Api.Application.Interfaces
     public interface IAuthService
     {
         Task<ApplicationUser> CreateUserAsync(RegisterRequest request, bool sendInvitationEmail = false);
-        Task<Tenant> CreateTenantAsync(string tenantName);
-        Task AssignUserToTenantAsync(Guid userId, Guid tenantId, string roleName);
         Task ConfirmEmailAsync(string userId, string token);
         Task ForgotPasswordAsync(ForgotPasswordRequest request);
         Task ResetPasswordAsync(ResetPasswordRequest request);
