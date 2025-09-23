@@ -39,6 +39,7 @@ namespace Garius.Caepi.Reader.Api.Infrastructure.DB
         {
             base.OnModelCreating(builder);
 
+            // CONVERSORES DE STATUS
             var tenantStatusConverter = new ValueConverter<TenantStatus, string>(
                 v => v.Value, // como salvar no banco
                 v => TenantStatus.FromValue(v) // como ler do banco

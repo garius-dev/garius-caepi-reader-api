@@ -1,5 +1,6 @@
 ﻿using Garius.Caepi.Reader.Api.Application.DTOs;
 using Garius.Caepi.Reader.Api.Application.Interfaces;
+using Garius.Caepi.Reader.Api.Domain.Entities;
 using Garius.Caepi.Reader.Api.Domain.Entities.Identity;
 using Garius.Caepi.Reader.Api.Exceptions;
 using Garius.Caepi.Reader.Api.Extensions;
@@ -11,6 +12,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using System.Security.Claims;
 using static Garius.Caepi.Reader.Api.Configuration.AppSecretsConfiguration;
+using static Garius.Caepi.Reader.Api.Domain.Constants.DBStatus;
+using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
 
 namespace Garius.Caepi.Reader.Api.Application.Services
 {
@@ -26,6 +29,7 @@ namespace Garius.Caepi.Reader.Api.Application.Services
         private readonly ICacheService _cacheService;
         private readonly ITenantService _tenantService;
         private readonly IEmailSender _emailSender;
+        private readonly IRefreshTokenService _refreshTokenService;
         private readonly UrlSettings _urlSettings;
 
         public AuthService(
@@ -38,6 +42,7 @@ namespace Garius.Caepi.Reader.Api.Application.Services
             ICacheService cacheService,
             ITenantService tenantService,
             IOptions<UrlSettings> urlSettings,
+            IRefreshTokenService refreshTokenService,
             IEmailSender emailSender)
         {
             _appKeyManagementSettings = appKeyManagementSettings.Value;
@@ -51,6 +56,7 @@ namespace Garius.Caepi.Reader.Api.Application.Services
             _roleManager = roleManager;
             _emailSender = emailSender;
             _urlSettings = urlSettings.Value;
+            _refreshTokenService = refreshTokenService;
         }
 
         private class LoginPayload
@@ -103,6 +109,7 @@ namespace Garius.Caepi.Reader.Api.Application.Services
             user.NormalizedFullName = user.FullName.ToUpperInvariant();
 
             var result = await _userManager.CreateAsync(user, request.Password);
+
             if (!result.Succeeded)
                 throw new ValidationException(string.Join("; ", result.Errors.Select(e => e.Description)));
 
@@ -205,7 +212,7 @@ namespace Garius.Caepi.Reader.Api.Application.Services
 
         public async Task<string> ExternalLoginCallbackAsync(string transitionUrl, string? returnUrl)
         {
-            ExternalLoginInfo info = await _signInManager.GetExternalLoginInfoAsync().ConfigureAwait(false)
+            ExternalLoginInfo info = await _signInManager.GetExternalLoginInfoAsync()
                 ?? throw new ValidationException("Não foi possível obter informações do provedor externo.");
 
             var user = await _userManager.FindByLoginAsync(info.LoginProvider, info.ProviderKey);
@@ -230,8 +237,8 @@ namespace Garius.Caepi.Reader.Api.Application.Services
                 }
             }
 
-            var roles = await _userManager.GetRolesAsync(user).ConfigureAwait(false);
-            var claims = await _userManager.GetClaimsAsync(user).ConfigureAwait(false);
+            var roles = await _userManager.GetRolesAsync(user);
+            var claims = await _userManager.GetClaimsAsync(user);
 
             var code = SecurityExtensions.CreateOneTimeCode();
             var codeHash = code.ComputeHash();
@@ -239,13 +246,61 @@ namespace Garius.Caepi.Reader.Api.Application.Services
             await _cacheService.SetAsync(
                 $"ext_code:{codeHash}",
                 new LoginPayload { UserId = user.Id, Roles = roles, Claims = claims },
-                TimeSpan.FromMinutes(1)).ConfigureAwait(false);
+                TimeSpan.FromMinutes(1));
 
             var parts = new List<string> { $"code={Uri.EscapeDataString(code)}" };
             if (!string.IsNullOrWhiteSpace(returnUrl))
                 parts.Add($"returnUrl={Uri.EscapeDataString(returnUrl)}");
 
             return $"{transitionUrl}#{string.Join("&", parts)}";
+        }
+
+
+        // public async Task<TokenResponse> LoginAsync(LoginRequest request)
+        public async Task<TokenResponse> LoginAsync(LoginRequest request)
+        {
+            var emailEncrypt = request.Email.EncryptAndHashText(_appKeyManagementSettings);
+
+            ApplicationUser? user = await _userManager.Users
+                .IgnoreQueryFilters()
+                .Include(ur => ur.UserRoles)
+                    .ThenInclude(r => r.Role)
+                    .ThenInclude(rn => rn.Claims)
+                .Include(t => t.TenantMemberships.Where(w => w.Enabled))
+                    .ThenInclude(tu => tu.Tenant)
+                .FirstOrDefaultAsync(u => u.EmailHash == emailEncrypt.textHash);
+
+            if (user == null)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(200));
+                throw new UnauthorizedAccessAppException("Credenciais inválidas.");
+            }
+
+            var result = await _signInManager.CheckPasswordSignInAsync(user!, request.Password, lockoutOnFailure: true);
+
+            if (!result.Succeeded)
+                throw new UnauthorizedAccessAppException("Credenciais inválidas.");
+
+            await _userManager.ResetAccessFailedCountAsync(user!);
+
+            var userTenant = user!.TenantMemberships
+                .Where(tm => tm.Enabled && tm.Tenant.Status == TenantStatus.Active)
+                .OrderBy(tm => tm.Tenant.CreatedAt)
+                .FirstOrDefault();
+
+            if (userTenant == null)
+                throw new UnauthorizedAccessAppException("Credenciais inválidas.");
+
+            IList<string> roles = await _userManager.GetRolesAsync(user!);
+            IList<Claim> claims = user.UserRoles
+                .SelectMany(ur => ur.Role.Claims)
+                .Select(rc => new Claim(rc.ClaimType!, rc.ClaimValue!))
+                .ToList();
+
+            var accessToken = _jwtTokenService.GenerateToken(user, userTenant.TenantId.ToString(), roles, claims);
+            var refreshToken = await _refreshTokenService.GenerateRefreshTokenAsync(user, userTenant.TenantId);
+
+            return new TokenResponse(accessToken, refreshToken);
         }
 
         private void SendConfirmationEmailInBackground(string baseUrl, string emailConfirmationUrl, string email, string userName, string userId, string encodedToken)

@@ -11,5 +11,8 @@ namespace Garius.Caepi.Reader.Api.Application.Interfaces
         Task AssignUserToTenantAsync(Guid userId, Guid tenantId, SystemRoles roleName);
         Task SignupUserAndTenantAsync(SignupTenantRequest request);
         Task SignupConfirmEmailAsync(Guid userId, Guid tenantId, string token);
+
+        Task<InviteUserToTenantResponse> InviteUserToTenantAsync(InviteUserToTenantRequest request);
+        Task<ConfirmInviteUserToTenantRequest> ValidateInviteUserToTenantAsync(Guid userId, Guid tenantId, string token);
     }
 }

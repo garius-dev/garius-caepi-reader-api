@@ -1,11 +1,13 @@
 using Asp.Versioning;
 using Garius.Caepi.Reader.Api.Application.DTOs;
 using Garius.Caepi.Reader.Api.Application.Interfaces;
+using Garius.Caepi.Reader.Api.Domain.Constants;
 using Garius.Caepi.Reader.Api.Exceptions;
 using Garius.Caepi.Reader.Api.Extensions;
 using Garius.Caepi.Reader.Api.Infrastructure.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using static Garius.Caepi.Reader.Api.Domain.Constants.SystemPermissions;
 
 namespace Garius.Caepi.Reader.Api.Controllers
 {
@@ -14,7 +16,7 @@ namespace Garius.Caepi.Reader.Api.Controllers
     [ApiVersion("1.0")]
     public class WeatherForecastController : ControllerBase
     {
-        private readonly IAuthService _authService;
+        private readonly ITenantService _tenantService;
 
         private static readonly string[] Summaries = new[]
         {
@@ -23,16 +25,18 @@ namespace Garius.Caepi.Reader.Api.Controllers
 
         private readonly ILogger<WeatherForecastController> _logger;
 
-        public WeatherForecastController(ILogger<WeatherForecastController> logger, IAuthService authService)
+        public WeatherForecastController(ILogger<WeatherForecastController> logger, ITenantService tenantService)
         {
-            _authService = authService;
+            _tenantService = tenantService;
             _logger = logger;
         }
 
         [HttpGet(Name = "GetWeatherForecast")]
-        [Authorize]
+        [Authorize(Policy = TenantPermissions.Read)]
         public IEnumerable<WeatherForecast> Get()
         {
+
+            var tenantId = _tenantService.GetTenantId();
 
             return Enumerable.Range(1, 5).Select(index => new WeatherForecast
             {
@@ -41,25 +45,6 @@ namespace Garius.Caepi.Reader.Api.Controllers
                 Summary = Summaries[Random.Shared.Next(Summaries.Length)]
             })
             .ToArray();
-        }
-
-        [HttpGet("confirm-email")]
-        public async Task<IActionResult> ConfirmEmail([FromQuery] string userId, [FromQuery] string token)
-        {
-            await _authService.ConfirmEmailAsync(userId, token);
-
-            return Ok(ApiResponse<string>.Ok("E-mail confirmado com sucesso"));
-        }
-
-        [HttpPost("reset-password")]
-        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
-        {
-            if (!ModelState.IsValid)
-                throw new ValidationException("Requisição inválida: " + ModelState.ToFormattedErrorString());
-
-            await _authService.ResetPasswordAsync(request);
-
-            return Ok(ApiResponse<string>.Ok("Senha redefinida com sucesso"));
         }
     }
 }

@@ -19,15 +19,15 @@ namespace Garius.Caepi.Reader.Api.Infrastructure.Services
             _jwtSettings = jwtSettings.Value;
         }
 
-        public string GenerateToken(ApplicationUser user, string tid, IList<string> roles, IEnumerable<string> permissions)
+        public string GenerateToken(ApplicationUser user, string tid, IList<string> roles, IList<Claim> permissions)
         {
             var claims = new List<Claim>
             {
                 new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
                 new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
                 new Claim(JwtRegisteredClaimNames.Iat, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
-                new Claim(JwtRegisteredClaimNames.Iss, "garius-api"),
-                new Claim(JwtRegisteredClaimNames.Aud, "garius-api-clients"),
+                new Claim(JwtRegisteredClaimNames.Iss, _jwtSettings.Issuer),
+                new Claim(JwtRegisteredClaimNames.Aud, _jwtSettings.Audience),
                 new("firstName", user.FirstName ?? string.Empty),
                 new("lastName", user.LastName ?? string.Empty),
             };
@@ -36,7 +36,7 @@ namespace Garius.Caepi.Reader.Api.Infrastructure.Services
 
             claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
 
-            claims.AddRange(permissions.Select(permission => new Claim("permissions", permission)));
+            claims.AddRange(permissions.Select(permission => new Claim("permission", permission.Value)));
 
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.Secret));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);

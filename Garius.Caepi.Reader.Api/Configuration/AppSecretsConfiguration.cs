@@ -14,6 +14,7 @@ namespace Garius.Caepi.Reader.Api.Configuration
             public string InvitationPath { get; set; } = "/register-from-invite";
             public string ValidateInvitationPath { get; set; } = "/intivations/validate";
             public string TenantEmailConfirmationPath { get; set; } = "/confirm-email";
+            public string TenantInviteEmailConfirmationPath { get; set; } = "/confirm-invite";
         }
 
         public class JwtSettings

@@ -24,6 +24,8 @@ namespace Garius.Caepi.Reader.Api.Application.Services
         private readonly IAuthService _authService;
         private readonly IEmailSender _emailSender;
         private readonly UrlSettings _urlSettings;
+        private readonly ITenantService _tenantService;
+        private readonly AppKeyManagementSettings _appKeyManagementSettings;
 
         public TenantManagementService(
             ApplicationDbContext dbContext,
@@ -32,6 +34,8 @@ namespace Garius.Caepi.Reader.Api.Application.Services
             RoleManager<ApplicationRole> roleManager,
             IAuthService authService,
             IOptions<UrlSettings> urlSettings,
+            ITenantService tenantService,
+            IOptions<AppKeyManagementSettings> appKeyManagementSettings,
             IEmailSender emailSender)
         {
             _dbContext = dbContext;
@@ -41,6 +45,8 @@ namespace Garius.Caepi.Reader.Api.Application.Services
             _authService = authService;
             _emailSender = emailSender;
             _urlSettings = urlSettings.Value;
+            _tenantService = tenantService;
+            _appKeyManagementSettings = appKeyManagementSettings.Value;
 
             _urlSettings.FrontendBaseUrl = "https://localhost:7090/api/v1/tenant";
         }
@@ -68,6 +74,11 @@ namespace Garius.Caepi.Reader.Api.Application.Services
 
         public async Task AssignUserToTenantAsync(Guid userId, Guid tenantId, SystemRoles roleName)
         {
+            var user = await _userManager.FindByIdAsync(userId.ToString());
+
+            if (user == null)
+                throw new NotFoundException("Usuário não encontrado.");
+
             var role = await _roleManager.FindByNameAsync(roleName);
 
             if (role == null)
@@ -77,7 +88,7 @@ namespace Garius.Caepi.Reader.Api.Application.Services
                 .Any(ut => ut.TenantId == tenantId && ut.UserId == userId);
 
             if (existingMembership)
-                throw new ValidationException("Usuário já foi regustrado.");
+                throw new ValidationException("Usuário já foi registrado.");
 
             var userTenant = new UserTenant()
             {
@@ -89,6 +100,12 @@ namespace Garius.Caepi.Reader.Api.Application.Services
 
             _dbContext.UserTenants.Add(userTenant);
             await _dbContext.SaveChangesAsync();
+
+            //verifica se o usuário já está na role, se não estiver adiciona
+            if (!await _userManager.IsInRoleAsync(user, roleName))
+            {
+                await _userManager.AddToRoleAsync(user, roleName);
+            }
         }
 
         public async Task SignupUserAndTenantAsync(SignupTenantRequest request)
@@ -145,12 +162,14 @@ namespace Garius.Caepi.Reader.Api.Application.Services
 
                 try
                 {
+                    await _authService.ConfirmEmailAsync(userId.ToString(), token);
+
                     await AssignUserToTenantAsync(userId, tenantId, SystemRoles.Owner);
 
                     var tenant = await _dbContext.Tenants
                         .FirstOrDefaultAsync(t => t.Id == tenantId);
 
-                    if(tenant == null)
+                    if (tenant == null)
                         throw new NotFoundException("Tenant não encontrado.");
 
                     //atualiza status do tenant para ativo
@@ -166,6 +185,96 @@ namespace Garius.Caepi.Reader.Api.Application.Services
                     throw;
                 }
             });
+        }
+
+        public async Task<InviteUserToTenantResponse> InviteUserToTenantAsync(InviteUserToTenantRequest request)
+        {
+            var tenantId = _tenantService.GetTenantId();
+
+            var tenant = await _dbContext.Tenants
+                .FirstOrDefaultAsync(t => t.Id == tenantId);
+
+            if (tenant == null)
+                throw new NotFoundException("Tenant não encontrado.");
+
+            var emailEncrypt = request.Email.EncryptAndHashText(_appKeyManagementSettings);
+
+            ApplicationUser? user = await _userManager.Users
+                .IgnoreQueryFilters()
+                .Include(ur => ur.UserRoles)
+                    .ThenInclude(r => r.Role)
+                    .ThenInclude(rn => rn.Claims)
+                .Include(t => t.TenantMemberships.Where(w => w.Enabled))
+                    .ThenInclude(tu => tu.Tenant)
+                .FirstOrDefaultAsync(u => u.EmailHash == emailEncrypt.textHash);
+
+            if (user == null)
+            {
+                user = await _authService.CreateUserAsync(new RegisterRequest
+                {
+                    FirstName = request.FirstName,
+                    LastName = request.LastName,
+                    Email = request.Email,
+                    Password = SecurityExtensions.CreateOneTimeCode(12).ComputeHash(),
+                    ConfirmPassword = SecurityExtensions.CreateOneTimeCode(12).ComputeHash()
+                }, false);
+
+                var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+                var encodedToken = token.Base64UrlEncode();
+
+                SendTenantConfirmationEmailInBackground(
+                        _urlSettings.FrontendBaseUrl,
+                        _urlSettings.TenantEmailConfirmationPath,
+                        request.Email,
+                        request.FirstName,
+                        tenant.TradeName,
+                        user.Id.ToString(),
+                        tenant.Id.ToString(),
+                        encodedToken);
+
+                return new InviteUserToTenantResponse(false, "Usuário convidado com sucesso.");
+            }
+
+            if(user.TenantMemberships.Any(a => a.TenantId == tenantId && a.Enabled))
+                throw new ValidationException("Usuário já possui acesso ao sistema.");
+
+            await AssignUserToTenantAsync(user.Id, tenantId, request.RoleName ?? SystemRoles.User);
+
+            return new InviteUserToTenantResponse(true, "Acesso ao sistema concedido com sucesso.");
+        }
+
+        public async Task<ConfirmInviteUserToTenantRequest> ValidateInviteUserToTenantAsync(Guid userId, Guid tenantId, string token)
+        {
+            var tenant = await _dbContext.Tenants
+                .FirstOrDefaultAsync(t => t.Id == tenantId);
+
+            if (tenant == null)
+                throw new NotFoundException("Tenant não encontrado.");
+
+            ApplicationUser? user = await _userManager.Users
+                .IgnoreQueryFilters()
+                .Include(ur => ur.UserRoles)
+                    .ThenInclude(r => r.Role)
+                    .ThenInclude(rn => rn.Claims)
+                .Include(t => t.TenantMemberships.Where(w => w.Enabled))
+                    .ThenInclude(tu => tu.Tenant)
+                .FirstOrDefaultAsync(u => u.Id == userId);
+
+            if(user == null)
+                throw new NotFoundException("Usuário não encontrado.");
+
+            await _authService.ConfirmEmailAsync(userId.ToString(), token);
+
+            var userEmail = user.EmailEncrypted.Decrypt(_appKeyManagementSettings.GetKeyBytes(), _appKeyManagementSettings.GetIVBytes());
+
+            ConfirmInviteUserToTenantRequest response = new ConfirmInviteUserToTenantRequest()
+            {
+                UserId = user.Id,
+                TenantId = tenant.Id,
+                Email = userEmail,
+            };
+
+            return response;
         }
 
         private void SendTenantConfirmationEmailInBackground(string baseUrl, string emailConfirmationUrl, string email, string userName, string tenantName, string userId, string tenantId, string encodedToken)

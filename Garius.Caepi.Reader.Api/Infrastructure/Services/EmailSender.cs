@@ -61,7 +61,7 @@ namespace Garius.Caepi.Reader.Api.Infrastructure.Services
 
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _settings.ApiKey);
 
-            var response = await _httpClient.SendAsync(request).ConfigureAwait(false);
+            var response = await _httpClient.SendAsync(request);
 
             if (!response.IsSuccessStatusCode)
             {

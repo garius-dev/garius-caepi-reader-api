@@ -1,7 +1,6 @@
 using Asp.Versioning;
 using Asp.Versioning.ApiExplorer;
 using Garius.Caepi.Reader.Api.Configuration;
-using Garius.Caepi.Reader.Api.Domain.Constants;
 using Garius.Caepi.Reader.Api.Domain.Entities.Identity;
 using Garius.Caepi.Reader.Api.Extensions;
 using Garius.Caepi.Reader.Api.Infrastructure.DB;
@@ -23,7 +22,6 @@ using System.Text.Json;
 using static Garius.Caepi.Reader.Api.Configuration.AppSecretsConfiguration;
 
 var builder = WebApplication.CreateBuilder(args);
-
 
 // --- CONFIGURA플O DAS VARI햂EIS DE AMBIENTE ---
 var enableHttpsRedirect =
@@ -109,74 +107,6 @@ builder.Services.AddApiVersioning(options =>
     options.SubstituteApiVersionInUrl = true;
 });
 
-// --- CONFIGURA플O DOS COOKIES DE AUTENTICA플O ---
-builder.Services.Configure<CookieAuthenticationOptions>(IdentityConstants.ExternalScheme, options =>
-{
-    options.Cookie.SameSite = SameSiteMode.None;
-    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-    options.Cookie.HttpOnly = true;
-});
-
-builder.Services.ConfigureApplicationCookie(options =>
-{
-    options.LoginPath = "/api/v1/auth/login";
-    options.AccessDeniedPath = "/api/v1/auth/access-denied";
-    options.Cookie.HttpOnly = true;
-    options.Cookie.SameSite = SameSiteMode.None;
-    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-});
-
-builder.Services.ConfigureExternalCookie(options =>
-{
-    options.Cookie.SameSite = SameSiteMode.None;
-    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-});
-
-builder.Services.AddAuthentication(options =>
-{
-    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-})
-.AddJwtBearer(options =>
-{
-    var jwtConfig = builder.Configuration.GetSection("JwtSettings").Get<JwtSettings>()!;
-    options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
-    options.SaveToken = true;
-    options.TokenValidationParameters = new TokenValidationParameters
-    {
-        ValidateIssuer = true,
-        ValidateAudience = true,
-        ValidateLifetime = true,
-        ValidateIssuerSigningKey = true,
-        ValidIssuer = jwtConfig.Issuer,
-        ValidAudience = jwtConfig.Audience,
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtConfig.Secret)),
-        ClockSkew = TimeSpan.Zero,
-    };
-})
-.AddGoogle("Google", options =>
-{
-    var google = builder.Configuration.GetSection("GoogleExternalAuthSettings").Get<GoogleExternalAuthSettings>()!;
-    options.CorrelationCookie.SameSite = SameSiteMode.None;
-    options.CorrelationCookie.SecurePolicy = CookieSecurePolicy.Always;
-    options.ClientId = google.ClientId;
-    options.ClientSecret = google.ClientSecret;
-    options.SaveTokens = true;
-    options.CallbackPath = "/signin-google";
-    options.Scope.Add("profile");
-    options.Scope.Add("email");
-})
-.AddMicrosoftAccount("Microsoft", options =>
-{
-    var ms = builder.Configuration.GetSection("MicrosoftExternalAuthSettings").Get<MicrosoftExternalAuthSettings>()!;
-    options.ClientId = ms.ClientId;
-    options.ClientSecret = ms.ClientSecret;
-    options.SaveTokens = true;
-    options.CallbackPath = "/signin-microsoft";
-    options.CorrelationCookie.SameSite = SameSiteMode.None;
-    options.CorrelationCookie.SecurePolicy = CookieSecurePolicy.Always;
-});
-
 // --- CONFIGURA플O DO BANCO DE DADOS ---
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(connectionString, npgsqlOptionsAction: sqlOptions =>
@@ -223,6 +153,88 @@ builder.Services
     })
     .AddEntityFrameworkStores<ApplicationDbContext>()
     .AddDefaultTokenProviders();
+
+// --- CONFIGURA플O DOS COOKIES DE AUTENTICA플O ---
+builder.Services.Configure<CookieAuthenticationOptions>(IdentityConstants.ExternalScheme, options =>
+{
+    options.Cookie.SameSite = SameSiteMode.None;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.Cookie.HttpOnly = true;
+});
+
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    options.LoginPath = "/api/v1/auth/login";
+    options.AccessDeniedPath = "/api/v1/auth/access-denied";
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SameSite = SameSiteMode.None;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+});
+
+builder.Services.ConfigureExternalCookie(options =>
+{
+    options.Cookie.SameSite = SameSiteMode.None;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+});
+
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    var jwtConfig = builder.Configuration.GetSection("JwtSettings").Get<JwtSettings>()!;
+    options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
+    options.SaveToken = true;
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = false,
+        ValidateAudience = false,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = jwtConfig.Issuer,
+        ValidAudience = jwtConfig.Audience,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtConfig.Secret)),
+        ClockSkew = TimeSpan.Zero,
+    };
+
+    options.Events = new JwtBearerEvents
+    {
+        OnAuthenticationFailed = ctx =>
+        {
+            Log.Information($"Auth failed: {ctx.Exception}");
+            return Task.CompletedTask;
+        },
+        OnTokenValidated = ctx =>
+        {
+            Log.Information($"Token validado para {ctx.Principal.Identity?.Name}");
+            return Task.CompletedTask;
+        }
+    };
+})
+.AddGoogle("Google", options =>
+{
+    var google = builder.Configuration.GetSection("GoogleExternalAuthSettings").Get<GoogleExternalAuthSettings>()!;
+    options.CorrelationCookie.SameSite = SameSiteMode.None;
+    options.CorrelationCookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.ClientId = google.ClientId;
+    options.ClientSecret = google.ClientSecret;
+    options.SaveTokens = true;
+    options.CallbackPath = "/signin-google";
+    options.Scope.Add("profile");
+    options.Scope.Add("email");
+})
+.AddMicrosoftAccount("Microsoft", options =>
+{
+    var ms = builder.Configuration.GetSection("MicrosoftExternalAuthSettings").Get<MicrosoftExternalAuthSettings>()!;
+    options.ClientId = ms.ClientId;
+    options.ClientSecret = ms.ClientSecret;
+    options.SaveTokens = true;
+    options.CallbackPath = "/signin-microsoft";
+    options.CorrelationCookie.SameSite = SameSiteMode.None;
+    options.CorrelationCookie.SecurePolicy = CookieSecurePolicy.Always;
+});
 
 // --- CONFIGURA플O DOS CONTROLLERS ---
 builder.Services.AddControllers()
@@ -356,7 +368,7 @@ app.MapHealthChecks("/healthz", new HealthCheckOptions
                 data = e.Value.Data,
             }),
         });
-        await context.Response.WriteAsync(result).ConfigureAwait(false);
+        await context.Response.WriteAsync(result);
     },
 });
 

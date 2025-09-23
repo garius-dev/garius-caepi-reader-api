@@ -1,8 +1,6 @@
-﻿using Garius.Caepi.Reader.Api.Application.DTOs;
-using Garius.Caepi.Reader.Api.Domain.Entities;
+﻿
+using Garius.Caepi.Reader.Api.Application.DTOs;
 using Garius.Caepi.Reader.Api.Domain.Entities.Identity;
-using Google.Apis.Auth.OAuth2.Responses;
-using Microsoft.AspNetCore.Mvc;
 
 namespace Garius.Caepi.Reader.Api.Application.Interfaces
 {
@@ -12,6 +10,8 @@ namespace Garius.Caepi.Reader.Api.Application.Interfaces
         Task ConfirmEmailAsync(string userId, string token);
         Task ForgotPasswordAsync(ForgotPasswordRequest request);
         Task ResetPasswordAsync(ResetPasswordRequest request);
+
+        Task<TokenResponse> LoginAsync(LoginRequest request);
 
         //Task<TokenResponse> LoginAsync(LoginRequest request);
         //Task<TokenResponse> RefreshTokenAsync(string refreshToken);

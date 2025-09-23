@@ -15,7 +15,7 @@ namespace Garius.Caepi.Reader.Api.Infrastructure.Services
 
         public async Task<T?> GetAsync<T>(string key)
         {
-            var value = await _cache.GetStringAsync(key).ConfigureAwait(false);
+            var value = await _cache.GetStringAsync(key);
             return value == null ? default : JsonConvert.DeserializeObject<T>(value);
         }
 
@@ -25,17 +25,17 @@ namespace Garius.Caepi.Reader.Api.Infrastructure.Services
             var options = new DistributedCacheEntryOptions();
             if (expiration.HasValue)
                 options.AbsoluteExpirationRelativeToNow = expiration;
-            await _cache.SetStringAsync(key, json, options).ConfigureAwait(false);
+            await _cache.SetStringAsync(key, json, options);
         }
 
         public async Task RemoveAsync(string key)
         {
-            await _cache.RemoveAsync(key).ConfigureAwait(false);
+            await _cache.RemoveAsync(key);
         }
 
         public async Task<bool> ExistsAsync(string key)
         {
-            var value = await _cache.GetAsync(key).ConfigureAwait(false);
+            var value = await _cache.GetAsync(key);
             return value != null;
         }
 
@@ -47,7 +47,7 @@ namespace Garius.Caepi.Reader.Api.Infrastructure.Services
                 AbsoluteExpiration = null,
                 SlidingExpiration = null
             };
-            await _cache.SetStringAsync(key, json, options).ConfigureAwait(false);
+            await _cache.SetStringAsync(key, json, options);
         }
     }
 }

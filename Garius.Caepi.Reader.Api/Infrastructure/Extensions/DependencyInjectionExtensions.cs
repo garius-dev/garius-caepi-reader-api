@@ -22,6 +22,7 @@ namespace Garius.Caepi.Reader.Api.Infrastructure.Extensions
             builder.Services.AddScoped<IAuthService, AuthService>();
             builder.Services.AddScoped<IEmailTemplateService, EmailTemplateService>();
             builder.Services.AddScoped<ITenantManagementService, TenantManagementService>();
+            builder.Services.AddScoped<IRefreshTokenService, RefreshTokenService>();
 
 
             builder.Services.AddHttpClient<IEmailSender, EmailSender>();

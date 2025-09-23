@@ -19,7 +19,7 @@ namespace Garius.Caepi.Reader.Api.Infrastructure.Middleware
         {
             try
             {
-                await _next(context).ConfigureAwait(false);
+                await _next(context);
             }
             catch (BaseException ex)
             {
@@ -38,7 +38,7 @@ namespace Garius.Caepi.Reader.Api.Infrastructure.Middleware
 
                 var result = JsonSerializer.Serialize(response, options);
 
-                await context.Response.WriteAsync(result).ConfigureAwait(false);
+                await context.Response.WriteAsync(result);
             }
         }
     }

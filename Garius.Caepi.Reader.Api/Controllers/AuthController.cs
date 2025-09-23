@@ -40,5 +40,14 @@ namespace Garius.Caepi.Reader.Api.Controllers
 
             return Ok(ApiResponse<object>.Ok(userId, "E-mail confirmado com sucesso"));
         }
+
+        [HttpPost("login")]
+        public async Task<IActionResult> Login([FromBody] LoginRequest request)
+        {
+            if (!ModelState.IsValid)
+                throw new ValidationException("Requisição inválida: " + ModelState.ToFormattedErrorString());
+            var result = await _authService.LoginAsync(request);
+            return Ok(ApiResponse<object>.Ok(result, "Login realizado com sucesso."));
+        }
     }
 }

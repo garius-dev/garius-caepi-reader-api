@@ -69,5 +69,22 @@ namespace Garius.Caepi.Reader.Api.Controllers
 
             return Ok(ApiResponse<object>.Ok(new { userId, tenantId }, "Cadastro confirmado com sucesso."));
         }
+
+        [HttpPost("invite-user")]
+        [Authorize]
+        public async Task<IActionResult> InviteUserToTenant([FromBody] InviteUserToTenantRequest request)
+        {
+            var result = await _tenantManagementService.InviteUserToTenantAsync(request);
+
+            return Ok(ApiResponse<object>.Ok(result, result.Message));
+        }
+
+        [HttpGet("invite-validate")]
+        public async Task<IActionResult> ValidateInvitation([FromQuery] Guid userId, [FromQuery] Guid tenantId, [FromQuery] string token)
+        {
+            var result = await _tenantManagementService.ValidateInviteUserToTenantAsync(userId, tenantId, token);
+
+            return Ok(ApiResponse<object>.Ok(result, "Usuário Validado."));
+        }
     }
 }
